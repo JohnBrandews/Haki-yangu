@@ -1,14 +1,15 @@
 import { ChatResponse, Language, LetterResponse, Message, Scenario } from './types';
 
-const isBrowser = typeof window !== 'undefined';
-// In production on Vercel, requests to /api/* are routed to the backend service.
-// On localhost, we use '/api' which is then rewritten by next.config.ts to localhost:3001.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || (isBrowser ? '/api' : 'http://localhost:3001');
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export interface RateLimitInfo {
   limit?: string;
   remaining?: string;
   reset?: string;
+}
+
+export interface RateLimitError extends Error {
+  ratelimit?: RateLimitInfo;
 }
 
 export async function sendMessage(params: {
@@ -35,15 +36,15 @@ export async function sendMessage(params: {
   };
 
   if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
     if (res.status === 429) {
-      const data = await res.json().catch(() => ({}));
-      const err = new Error(data.message || 'Too many requests. Please wait a minute.');
-      (err as any).ratelimit = ratelimit;
+      const err = new Error(data.message || 'Too many requests. Please wait a minute.') as RateLimitError;
+      err.ratelimit = ratelimit;
       throw err;
     }
-    throw new Error(`Chat request failed: ${res.status}`);
+    throw new Error(data.message || `Chat request failed: ${res.status}`);
   }
-  
+
   const data = await res.json();
   return { ...data, ratelimit };
 }
@@ -65,11 +66,11 @@ export async function generateLetter(params: {
     }),
   });
   if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
     if (res.status === 429) {
-      const data = await res.json().catch(() => ({}));
       throw new Error(data.message || 'Too many requests. Please wait a minute.');
     }
-    throw new Error(`Letter request failed: ${res.status}`);
+    throw new Error(data.message || `Letter request failed: ${res.status}`);
   }
   return res.json();
 }

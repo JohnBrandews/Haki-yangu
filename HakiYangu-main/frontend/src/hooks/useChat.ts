@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Message, ChatResponse } from '@/lib/types';
-import { sendMessage, RateLimitInfo } from '@/lib/api';
+import { Message } from '@/lib/types';
+import { sendMessage, RateLimitError, RateLimitInfo } from '@/lib/api';
 import { Language } from '@/lib/types';
 
 function generateId() {
@@ -80,11 +80,20 @@ export function useChat(language: Language) {
         setMessages((prev) => [...prev, assistantMsg]);
         setDetectedArea(response.detectedArea);
         setSuggestLetter(response.suggestLetter);
-      } catch (err: any) {
-        if (err.ratelimit) {
-          setRateLimit(err.ratelimit);
+      } catch (error: unknown) {
+        if (error instanceof Error && 'ratelimit' in error) {
+          const rateLimitError = error as RateLimitError;
+          if (rateLimitError.ratelimit) {
+            setRateLimit(rateLimitError.ratelimit);
+          }
         }
-        setError(err.message || (language === 'sw' ? 'Kuna hitilafu. Tafadhali jaribu tena.' : 'Something went wrong. Please try again.'));
+        setError(
+          error instanceof Error && error.message
+            ? error.message
+            : language === 'sw'
+              ? 'Kuna hitilafu. Tafadhali jaribu tena.'
+              : 'Something went wrong. Please try again.',
+        );
       } finally {
         setIsLoading(false);
       }
